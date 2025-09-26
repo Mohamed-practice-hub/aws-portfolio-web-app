@@ -66,83 +66,127 @@
 </head>
 <body>
     <h1>Contact Me</h1>
-    
     <form id="contactForm">
         <div class="form-group">
             <label for="name">Name *</label>
             <input type="text" id="name" name="name" required>
         </div>
-        
         <div class="form-group">
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required>
         </div>
-        
         <div class="form-group">
             <label for="subject">Subject</label>
             <input type="text" id="subject" name="subject">
         </div>
-        
         <div class="form-group">
             <label for="message">Message *</label>
             <textarea id="message" name="message" required></textarea>
         </div>
-        
         <button type="submit" id="submitBtn">Send Message</button>
     </form>
-    
     <div id="messageDiv"></div>
-
     <script>
-        // Replace with your actual API Gateway URL
         const API_URL = 'https://lgmh26izte.execute-api.us-east-1.amazonaws.com/project1-prod/contact';
-        
         document.getElementById('contactForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
             const submitBtn = document.getElementById('submitBtn');
             const messageDiv = document.getElementById('messageDiv');
-            
-            // Disable submit button
             submitBtn.disabled = true;
             submitBtn.textContent = 'Sending...';
-            
-            // Clear previous messages
             messageDiv.innerHTML = '';
-            
-            // Get form data
             const formData = {
-                name: document.getElementById('name').value,
-                email: document.getElementById('email').value,
-                subject: document.getElementById('subject').value,
-                message: document.getElementById('message').value
+                name: document.getElementById('name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                subject: document.getElementById('subject').value.trim(),
+                message: document.getElementById('message').value.trim()
             };
-            
+            console.log('Sending form data:', formData);
+            console.log('API URL:', API_URL);
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(formData)
                 });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    messageDiv.innerHTML = `<div class="message success">${result.message}</div>`;
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                let result;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const textResult = await response.text();
+                    console.log('Non-JSON response:', textResult);
+                    result = { error: 'Server returned non-JSON response', debug: { response: textResult } };
+                }
+                console.log('Response data:', result);
+                if (response.ok && result.success) {
+                    messageDiv.innerHTML = `
+                        <div class="message success">
+                            ${result.message}
+                            ${result.debug ? `<br><small>Message ID: ${result.debug.messageId}</small>` : ''}
+                        </div>
+                    `;
                     document.getElementById('contactForm').reset();
                 } else {
-                    messageDiv.innerHTML = `<div class="message error">Error: ${result.error}</div>`;
+                    let errorMessage = result.error || 'Unknown error occurred';
+                    let debugInfo = '';
+                    if (result.debug) {
+                        debugInfo = `
+                            <details style="margin-top: 10px;">
+                                <summary>Debug Information (click to expand)</summary>
+                                <pre style="background: #f5f5f5; padding: 10px; margin-top: 5px; font-size: 12px; overflow-x: auto;">
+${JSON.stringify(result.debug, null, 2)}
+                                </pre>
+                            </details>
+                        `;
+                    }
+                    messageDiv.innerHTML = `
+                        <div class="message error">
+                            <strong>Error:</strong> ${errorMessage}
+                            ${debugInfo}
+                        </div>
+                    `;
                 }
             } catch (error) {
-                messageDiv.innerHTML = `<div class="message error">Network error. Please try again later.</div>`;
-                console.error('Error:', error);
+                console.error('Network/Fetch error:', error);
+                messageDiv.innerHTML = `
+                    <div class="message error">
+                        <strong>Network Error:</strong> ${error.message}
+                        <details style="margin-top: 10px;">
+                            <summary>Debug Information</summary>
+                            <pre style="background: #f5f5f5; padding: 10px; margin-top: 5px; font-size: 12px;">
+API URL: ${API_URL}
+Error Type: ${error.constructor.name}
+Error Message: ${error.message}
+Form Data: ${JSON.stringify(formData, null, 2)}
+                            </pre>
+                        </details>
+                    </div>
+                `;
             } finally {
-                // Re-enable submit button
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Send Message';
             }
+        });
+        window.addEventListener('load', function() {
+            console.log('Testing API connectivity...');
+            fetch(API_URL, {
+                method: 'OPTIONS'
+            }).then(response => {
+                console.log('OPTIONS request status:', response.status);
+                if (response.ok) {
+                    console.log('✅ API is reachable');
+                } else {
+                    console.log('❌ API OPTIONS request failed');
+                }
+            }).catch(error => {
+                console.log('❌ API connectivity test failed:', error);
+            });
         });
     </script>
 </body>
